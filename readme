@@ -1,0 +1,64 @@
+MazeSearcher — README
+=====================
+
+Simple Python application to draw a maze interactively and find a path using the A* algorithm.
+
+What it does
+------------
+- Let the user draw a grid-based maze (walls and free cells).
+- Let the user place a start and goal cell.
+- Run A* to find and visualize the shortest path.
+- Optionally step through the algorithm or clear/reset the grid.
+
+Requirements
+------------
+- Python 3.7+
+- (Depending on implementation) pygame or tkinter for the GUI
+- Optional: numpy (if used for grid operations)
+
+Installation
+------------
+1. Create and activate a virtual environment (recommended):
+    python -m venv venv
+    venv\Scripts\activate  (Windows) or source venv/bin/activate (macOS/Linux)
+
+2. Install dependencies (example for pygame):
+    pip install pygame
+
+3. Run the app:
+    python main.py
+
+Usage / Controls
+----------------
+- Left click + drag: draw walls
+- Right click + drag: erase walls
+- Press 'S' (or click a UI control): set Start at mouse position
+- Press 'G' (or click a UI control): set Goal at mouse position
+- Spacebar: start / pause A* search
+- 'N' or Step button: advance A* by one step (step mode)
+- 'C': clear grid (remove walls, start, goal)
+- 'R': randomize maze (optional)
+- 'Esc' or 'Q': quit
+
+Notes about A*
+-------------
+- Uses Manhattan or Euclidean heuristic depending on 4-way or 8-way movement.
+- Visualizes open set (frontier), closed set (visited), and final path.
+- Suitable for learning and small mazes; performance depends on grid size and implementation.
+
+Project layout (suggested)
+--------------------------
+- main.py         # application entry point / GUI loop
+- a_star.py       # implementation of A* algorithm
+- grid.py         # grid and cell data structures
+- ui.py           # input handling and drawing code
+- requirements.txt
+
+Contributing
+------------
+- Feel free to add features: weighted cells, diagonal movement, maze generators, different heuristics, save/load maps.
+- Keep PRs small and include a short description of changes.
+
+License
+-------
+- Choose a license for your project (e.g., MIT) and add a LICENSE file.
