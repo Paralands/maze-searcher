@@ -13,7 +13,7 @@ class DFSGenerator():
 
         # Start at a random even cell (representing the path-cell)
         start = (np.random.randint(1, self.size // 2) * 2, np.random.randint(1, self.size // 2) * 2)
-        stack.append(start)
+        stack.append(start) 
         grid[start] = 1 
 
         # Jumps two to account for walls
