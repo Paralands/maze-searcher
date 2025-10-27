@@ -1,8 +1,10 @@
-import pygame
-from maze import Maze
-from maze_generator import MazeGenerator
+from maze_searcher import Maze, MazeApp, MazeGeneratorAlgorithm
 
 maze = Maze(60)
-maze.run(randomize=False)
+app = MazeApp(maze)
 
+# Schedule initial tasks before running
+app.post_task(lambda: maze.generate(type=MazeGeneratorAlgorithm.DFS, show_process=True, by_space_bar=False, delay_ms=5))
 
+# Start the interactive window (blocking)
+app.run()

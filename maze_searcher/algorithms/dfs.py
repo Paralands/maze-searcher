@@ -1,3 +1,4 @@
+from typing import Iterator
 import numpy as np
 
 
@@ -5,7 +6,7 @@ class DFSGenerator():
     def __init__(self, size: int):
         self.size = size
 
-    def generate(self) -> list[list[int]]:
+    def generate(self) -> Iterator[np.ndarray]:
         # Initialize grid: 0 = wall, 1 = path
         grid = np.zeros((self.size, self.size), dtype=int)
 
@@ -15,6 +16,9 @@ class DFSGenerator():
         start = (np.random.randint(1, self.size // 2) * 2, np.random.randint(1, self.size // 2) * 2)
         stack.append(start) 
         grid[start] = 1 
+
+        # Initial yield of the starting grid
+        yield grid.copy()
 
         # Jumps two to account for walls
         directions = [(2, 0), (-2, 0), (0, 2), (0, -2)]
@@ -38,9 +42,10 @@ class DFSGenerator():
                 wall_x, wall_y = (nx + cell[0]) // 2, (ny + cell[1]) // 2
                 grid[neighbour] = 1      
                 grid[wall_x, wall_y] = 1
+
+                # Yield the current state of the grid
+                yield grid.copy()
             else:
                 stack.pop()
-                
-        return grid
 
         
