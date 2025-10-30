@@ -16,7 +16,7 @@ class DFSGenerator():
         start = (np.random.randint(1, self.size // 2) * 2, np.random.randint(1, self.size // 2) * 2)
         stack.append(start) 
         grid[start] = 1 
-
+        
         # Initial yield of the starting grid
         yield grid.copy()
 
