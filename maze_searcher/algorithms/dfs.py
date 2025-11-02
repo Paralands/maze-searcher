@@ -1,10 +1,11 @@
 from typing import Iterator
 import numpy as np
 
+from .generator_base import GeneratorBase
 
-class DFSGenerator():
-    def __init__(self, size: int):
-        self.size = size
+class DFSGenerator(GeneratorBase):
+    def __init__(self, maze_size: int):
+        self.size = maze_size
 
     def generate(self) -> Iterator[np.ndarray]:
         # Initialize grid of walls
