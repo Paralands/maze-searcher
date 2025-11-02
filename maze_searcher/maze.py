@@ -16,7 +16,7 @@ class Maze():
     0 = wall, 1 = path
     Walls are white, paths are black
     """
-    def __init__(self, size: int = 100):
+    def __init__(self, size: int = 35, block_size_px: int = 20):
         """
         Initializes a Maze object with a specified size.
         
@@ -26,18 +26,21 @@ class Maze():
         Raises:
             ValueError: If the size is not between 50 and 500 squares.
         """
-        if (size < 50 or size > 500):
-            raise ValueError("Maze size should be between 50 and 500 squares") 
+        if (size < 20 or size > 100):
+            raise ValueError("Maze size should be between 20 and 100 squares") 
 
         self.maze_size = size
 
         #TODO: improve block_size to be proportionate to the screen size
-        self.block_size_px = 20 
+        self.block_size_px = block_size_px 
 
         # Queues for thread-safe drawing, contains a list of (x, y, (r, g, b)) tuples
+        # [x, y]
         self.draw_queue = queue.Queue()
 
-        self.grid = np.zeros((self.maze_size, self.maze_size), dtype=int)  # 0 = wall, 1 = path
+        # [row, col]
+        # 0 = wall, 1 = path
+        self.grid = np.zeros((self.maze_size, self.maze_size), dtype=int)  
         
     # Returns the generator object that yields the grids step by step
     def generate(self, type: MazeGeneratorAlgorithm = MazeGeneratorAlgorithm.DFS) -> Iterator[np.ndarray]:
@@ -53,11 +56,7 @@ class Maze():
         self.generator = MazeGenerator(size=self.maze_size, type=type)
         grid_generator = self.generator.generate()
 
-        i = 1
-
         for grid in grid_generator:
-            print("Generated new grid step {}.".format(i))
-            i += 1
             yield grid
 
 
@@ -66,7 +65,7 @@ class Maze():
     def randomize(self, strict = True):
         if strict:
             self.randomize_strict()
-        else: self.randomize_relaxed
+        else: self.randomize_relaxed()
 
     def randomize_strict(self, amount = 50):
         fields = np.zeros((self.maze_size, self.maze_size), dtype=int)
@@ -128,11 +127,13 @@ class Maze():
         grid = np.array(grid)
         self.grid = grid
 
-        for (x, y), value in np.ndenumerate(grid):
+        for (row, col), value in np.ndenumerate(grid):
+            # Swap to corespond to the pygame [x,y] convention
+            x, y = col, row
+
             rectangle_list_to_draw = []
 
             if value == 0:
-                #print("Setting grid white at:", x, y)
                 rectangle_list_to_draw.append((x, y, 255, 255, 255))
             elif value == 1:
                 rectangle_list_to_draw.append((x, y, 0, 0, 0))
@@ -205,12 +206,14 @@ class Maze():
             raise ValueError("Parametrs r, g, b must be in range of (0, 256)")
 
         x, y = event.pos
+        row, col = y, x
+
         self.draw_queue.put([(x // self.block_size_px, y // self.block_size_px, (r, g, b))])
 
         if (r, g, b) == (0, 0, 0):
-            self.grid[x//self.block_size_px,y//self.block_size_px] = 1
+            self.grid[row//self.block_size_px, col//self.block_size_px] = 1
         elif (r, g, b) == (255, 255, 255):
-            self.grid[x//self.block_size_px,y//self.block_size_px] = 0 
+            self.grid[row//self.block_size_px, col//self.block_size_px] = 0 
         
     def draw_rectangle_at_square(self, x: int, y: int, r: int = 255, g: int = 255, b: int = 255) -> None:
         """
@@ -235,18 +238,15 @@ class Maze():
         
         Args:
             rectangles (list[tuple[int, int, int, int, int]]): A list of tuples where each tuple contains
-                (x, y, r, g, b) representing the square coordinates and color components.
+                (x, y, r, g, b) representing the square coordinates and color components
 
         Returns:
             None
         """
         rectangles_for_drawing = []
 
-        print("Drawing rectangle list:", rectangles)
-
         for rect in rectangles:
             x, y, r, g, b = rect
-            print("Preparing to draw rectangle at:", x, y, "with color:", (r, g, b))
 
             if not 0 <= r <= 255 or not 0 <= g <= 255 or not 0 <= b <= 255:
                 raise ValueError("Parametrs r, g, b must be in range of (0, 256)")
@@ -256,12 +256,13 @@ class Maze():
             
             rectangles_for_drawing.append((x, y, (r, g, b)))
 
-            if (r, g, b) == (0, 0, 0):
-                self.grid[x,y] = 1  
-            elif (r, g, b) == (255, 255, 255):
-                self.grid[x,y] = 0 
+            row, col = y, x
 
-        print("Putted rectangles:", rectangles_for_drawing)
+            if (r, g, b) == (0, 0, 0):
+                self.grid[row,col] = 1  
+            elif (r, g, b) == (255, 255, 255):
+                self.grid[row,col] = 0 
+
         self.draw_queue.put(rectangles_for_drawing) 
         
     def erase_rectangle(self, event) -> None:

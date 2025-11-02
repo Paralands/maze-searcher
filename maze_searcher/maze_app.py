@@ -17,10 +17,20 @@ class MazeApp:
         :param maze: The Maze object to be used in the application.
         """
         self.maze: Maze = maze
-        self.task_queue = queue.Queue()
-        self.running = False
         self.block_size_px = maze.block_size_px
-        self.clock = pygame.time.Clock()
+        self.task_queue = queue.Queue()
+
+        self.running = False
+
+        # Flags for maze generation
+        self.wait_for_space_bar = True
+        self.space_held = False
+        self.space_hold_start_time = 0
+        self.space_hold_threshold = 1000 # in ms
+
+        # Flags for drawing on the window
+        self.drawing = False
+        self.erasing = False
 
     def run(self) -> None:
         """
@@ -33,17 +43,19 @@ class MazeApp:
 
         pygame.init()
 
-        self.screen = pygame.display.set_mode((self.maze.maze_size*10, self.maze.maze_size*10))
+        self.screen = pygame.display.set_mode(
+            (self.maze.maze_size*self.maze.block_size_px, 
+             self.maze.maze_size*self.maze.block_size_px))
+        
         self.screen.fill((255, 255, 255)) 
+        pygame.display.flip()
 
         while self.running:
             self._handle_tasks()
             self._handle_events()
             self._handle_drawing()
+            
             pygame.display.flip()
-            print("Tick")
-            self.clock.tick(60)  # Limit to 60 FPS
-
 
         pygame.quit()
 
@@ -59,15 +71,15 @@ class MazeApp:
         """
         self.task_queue.put(task) 
 
-    def generate(self, type: MazeGeneratorAlgorithm = MazeGeneratorAlgorithm.DFS, show_process: bool = False, by_space_bar: bool = False, delay_ms: int = 10) -> None:
+    def generate(self, type: MazeGeneratorAlgorithm = MazeGeneratorAlgorithm.DFS, show_process: bool = False, by_space_bar: bool = False, delay_ms: int = 50) -> None:
         """
-        Generates the maze using the specified algorithm and visualizes the process.
+        Generates the maze using the specified algorithm and visualizes the process. 
 
         Args:
             type (MazeGeneratorAlgorithm): The maze generation algorithm to use (default is DFS).
             show_process (bool): If True, visualizes the process of generation (default is False).
-            by_space_bar (bool): If True, advances the generation step by step using the space bar (default is False).
-            delay_ms (int): Delay in milliseconds between steps when not using space bar (default is 10), ignored if by_space_bar is True.
+            by_space_bar (bool): If True, advances the generation step by step using the space bar, and makes it automatic with the delay if the space bar is held (default is False)
+            delay_ms (int): Delay in milliseconds between steps when not using space bar (default is 10), used to delay faster generation if by_space_bar is True.
 
         Returns:
             None
@@ -78,52 +90,53 @@ class MazeApp:
             try:
                 grid = next(generator)
 
-                for (i, j), value in np.ndenumerate(grid):
+                rectangle_list_to_draw = []
 
+                # Check for the grid updates
+                for (row, col), value in np.ndenumerate(grid):
+                    x, y = col, row
+                    
                     # 0 = wall (white), 1 = path (black)
+                    if value == 1 and self.maze.grid[row, col] == 0:
+                        rectangle_list_to_draw.append((x, y, 0, 0, 0))
+                    elif value == 0 and self.maze.grid[row, col] == 1:
+                        rectangle_list_to_draw.append((x, y, 255, 255, 255))
 
-                    rectangle_list_to_draw = []
+                if rectangle_list_to_draw != []:
+                    self.maze.draw_rectangle_list(rectangle_list_to_draw)
 
-                    if value == 1 and self.maze.grid[i, j] == 0:
-                        print("Updated path at:", i, j)
-                        rectangle_list_to_draw.append((i, j, 0, 0, 0))
-                    elif value == 0 and self.maze.grid[i, j] == 1:
-                        print("Updated path at:", i, j)
-                        rectangle_list_to_draw.append((i, j, 255, 255, 255))
+                if show_process:     
+                    if by_space_bar:   
+                        while self.wait_for_space_bar:
+                            if self.space_held:
+                                pygame.time.wait(delay_ms)
+                                break
+                            
+                            # Check if space was pressed
+                            for event in pygame.event.get():
+                                if event.type == pygame.KEYDOWN:
+                                    if event.key == pygame.K_SPACE:
+                                        self.space_hold_start_time = pygame.time.get_ticks()
+                                        self.wait_for_space_bar = False
+                            
+                            # Check if space is being held
+                            keys = pygame.key.get_pressed()
+                            if keys[pygame.K_SPACE]:
+                                if not self.space_held:
+                                    held_time = pygame.time.get_ticks() - self.space_hold_start_time
+                                    if held_time >= self.space_hold_threshold:
+                                        self.space_held = True
 
-                    if rectangle_list_to_draw != []:
-                        self.maze.draw_rectangle_list(rectangle_list_to_draw)
+                        self.wait_for_space_bar = True
+                    else:
+                        pygame.time.wait(delay_ms)
+                           
+                self.post_task(step)
 
-                self.post_task(step)    
-                # if by_space_bar:
-                    #TODO: implement space bar functionality
-                # else:
-
-                #if not by_space_bar:
-                #    print("Waiting ...")
-                #    pygame.time.wait(delay_ms)
             except StopIteration:
                 return
 
         self.post_task(step)   
-
-    #TODO: redo this method to be more practical
-    def post_task_repeated(self, task, delay_ms=10):
-        next_time = pygame.time.get_ticks() + delay_ms
-
-        def repeated_task():
-            nonlocal next_time
-
-            now = pygame.time.get_ticks()
-            if now >= next_time:
-                try:
-                    task()
-                except StopIteration:
-                    return
-                next_time = now + delay_ms
-            self.post_task(repeated_task) 
-
-        self.post_task(repeated_task)
 
     def _handle_tasks(self):
         """
@@ -133,7 +146,6 @@ class MazeApp:
             None
         """
         if not self.task_queue.empty():
-            print("Handling task...")
             task = self.task_queue.get()
             task()
 
@@ -145,49 +157,47 @@ class MazeApp:
             None
         """
         if not self.maze.draw_queue.empty():
-            print("Handling drawing...")
             rectangles = self.maze.draw_queue.get()
-
-            print("Rectangles to draw:", rectangles)
 
             for rect in rectangles:
                 x, y, (r, g, b) = rect
                 color = (r, g, b)
 
-                print("Drawing rectangle at:", x, y, "with color:", color)
-
-                if color == (0, 0, 0):
-                    print(f"Drawing at ({x}, {y}) with color {color}")
                 pygame.draw.rect(self.screen, 
                                     color, 
                                     (x * self.block_size_px,
                                     y * self.block_size_px, 
                                     self.block_size_px, 
                                     self.block_size_px))
-                print("Drawing done.")
 
     def _handle_events(self):
-        
-        drawing = False
-        erasing = False
-
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 self.running = False
+                
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == 1:
-                    drawing = True
-                    erasing = False
+                    self.drawing = True
+                    self.erasing = False
                     self.maze.draw_rectangle(event)
                 elif event.button == 3:
-                    drawing = False
-                    erasing = True
+                    self.drawing = False
+                    self.erasing = True
                     self.maze.erase_rectangle(event)
+
             elif event.type == pygame.MOUSEBUTTONUP:
-                drawing = False
-                erasing = False
+                self.drawing = False
+                self.erasing = False
+
             elif event.type == pygame.MOUSEMOTION:
-                if drawing:
+                if self.drawing:
                     self.maze.draw_rectangle(event)
-                if erasing:
+                if self.erasing:
                     self.maze.erase_rectangle(event)
+
+            elif event.type == pygame.KEYUP:
+                if event.key == pygame.K_SPACE:
+                    self.space_hold_start_time = 0
+                    self.space_held = False
+
+        
