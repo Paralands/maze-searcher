@@ -30,5 +30,5 @@ class MazeGenerator():
             An iterator that yields the maze grid at each step of generation.
         """
         if(self.type == MazeGeneratorAlgorithm.DFS):
-              from .algorithms import DFSGenerator
-              return DFSGenerator(size=self.size).generate()
+              from .generators import DFSGenerator
+              return DFSGenerator(maze_size=self.size).generate()

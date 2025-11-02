@@ -2,7 +2,7 @@ import queue
 import numpy as np
 import pygame
 
-from maze_searcher.maze_generator_algorithm import MazeGeneratorAlgorithm
+from .algorithms import MazeGeneratorAlgorithm
 from .maze import Maze
 
 
@@ -21,6 +21,7 @@ class MazeApp:
         self.task_queue = queue.Queue()
 
         self.running = False
+        self.screen_size_px = self.maze.maze_size * self.maze.block_size_px
 
         # Flags for maze generation
         self.wait_for_space_bar = True
@@ -44,8 +45,8 @@ class MazeApp:
         pygame.init()
 
         self.screen = pygame.display.set_mode(
-            (self.maze.maze_size*self.maze.block_size_px, 
-             self.maze.maze_size*self.maze.block_size_px))
+            (self.screen_size_px, 
+             self.screen_size_px))
         
         self.screen.fill((255, 255, 255)) 
         pygame.display.flip()

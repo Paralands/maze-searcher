@@ -5,8 +5,8 @@ import numpy as np
 import asyncio
 import time
 
-from .maze_generator import MazeGenerator
-from .maze_generator_algorithm import MazeGeneratorAlgorithm
+from .algorithms import MazeGenerator
+from .algorithms import MazeGeneratorAlgorithm
 
 #TODO: catch exceptions in maze running and generating like stack overflow etc.
 
