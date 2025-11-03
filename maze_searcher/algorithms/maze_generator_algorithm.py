@@ -1,8 +1,10 @@
 from enum import Enum, auto
 
 class MazeGeneratorAlgorithm(Enum):
+    """
+    Enumeration of maze generation algorithms.
+    """
+
     DFS = auto()
     PRIM = auto()
-    KRUSKAL = auto()
-    HUNT_KILL = auto()
     RANDOM_LINES = auto()

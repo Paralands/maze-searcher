@@ -2,8 +2,6 @@ import queue
 from typing import Iterator
 import pygame
 import numpy as np
-import asyncio
-import time
 
 from .algorithms import MazeGenerator
 from .algorithms import MazeGeneratorAlgorithm
@@ -42,7 +40,6 @@ class Maze():
         # 0 = wall, 1 = path
         self.grid = np.zeros((self.maze_size, self.maze_size), dtype=int)  
         
-    # Returns the generator object that yields the grids step by step
     def generate(self, type: MazeGeneratorAlgorithm = MazeGeneratorAlgorithm.DFS) -> Iterator[np.ndarray]:
         """
         Generates the maze using the specified algorithm.
@@ -58,9 +55,6 @@ class Maze():
 
         for grid in grid_generator:
             yield grid
-
-
-
 
     def randomize(self, strict = True):
         if strict:

@@ -4,10 +4,26 @@ import numpy as np
 from .generator_base import GeneratorBase
 
 class DFSGenerator(GeneratorBase):
+    """
+    Maze generator using Depth-First Search algorithm.
+    """
+
     def __init__(self, maze_size: int):
+        """
+        Initialize the DFS maze generator.
+
+        Args:
+            maze_size (int): Size of the maze (recommended to be odd).
+        """
         self.size = maze_size
 
     def generate(self) -> Iterator[np.ndarray]:
+        """
+        Generate a maze using Depth-First Search algorithm.
+
+        Yields:
+            Iterator[np.ndarray]: The current state of the maze grid at each step.
+        """
         # Initialize grid of walls
         # 0 = wall, 1 = path
         grid = np.zeros((self.size, self.size), dtype=int)

@@ -14,7 +14,9 @@ class MazeApp:
     def __init__(self, maze: Maze):
         """
         Initializes a MazeApp object with the specified maze.
-        :param maze: The Maze object to be used in the application.
+        
+        Args:
+            maze (Maze): The maze to be visualized and interacted with.
         """
         self.maze: Maze = maze
         self.block_size_px = maze.block_size_px
@@ -139,7 +141,7 @@ class MazeApp:
 
         self.post_task(step)   
 
-    def _handle_tasks(self):
+    def _handle_tasks(self) -> None:
         """
         Handles and executes tasks from the task queue.
         
@@ -150,7 +152,7 @@ class MazeApp:
             task = self.task_queue.get()
             task()
 
-    def _handle_drawing(self):
+    def _handle_drawing(self) -> None:
         """
         Handles drawing operations from the maze's draw queue.
         
@@ -171,7 +173,13 @@ class MazeApp:
                                     self.block_size_px, 
                                     self.block_size_px))
 
-    def _handle_events(self):
+    def _handle_events(self) -> None:
+        """
+        Handles Pygame events such as quitting, mouse actions, and key presses.
+        
+        Returns:
+            None
+        """
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 self.running = False
