@@ -189,12 +189,12 @@ class Maze():
 
         return possible_moves
 
-    def draw_rectangle(self, event, color: tuple[int, int, int] = (255, 255, 255)) -> None:
+    def draw_rectangle(self, pos: tuple[int, int], color: tuple[int, int, int] = (255, 255, 255)) -> None:
         """
-        Draws a rectangle at the position of the given event with the specified color and updates the grid.
+        Draws a rectangle at the position of pygame's event with the specified color and updates the grid.
         
         Args:
-            event: The pygame event containing the position to draw the rectangle.
+            pos: The pygame position of the event to draw the rectangle.
             r (int): Red component of the color (0-255).
             g (int): Green component of the color (0-255).
             b (int): Blue component of the color (0-255).
@@ -206,8 +206,8 @@ class Maze():
         if not 0 <= r <= 255 or not 0 <= g <= 255 or not 0 <= b <= 255:
             raise ValueError("Parametrs r, g, b must be in range of (0, 256)")
 
-        x, y = event.pos
-        row, col = y, x
+        x, y = pos
+        row, col = int(y), int(x)
 
         self.draw_queue.put([(x // self.block_size_px, y // self.block_size_px, (r, g, b))])
 
@@ -267,17 +267,17 @@ class Maze():
 
         self.draw_queue.put(rectangles_for_drawing) 
         
-    def erase_rectangle(self, event) -> None:
+    def erase_rectangle(self, pos: tuple[int, int]) -> None:
         """
-        Erases a rectangle at the position of the given event (draws wall).
+        Erases a rectangle at the position (draws wall).
         
         Args:
-            event: The pygame event containing the position to erase the rectangle.
+            pos: The pygame position of the event to erase the rectangle.
 
         Returns:
             None
         """
-        self.draw_rectangle(event, color=self.wall_color)
+        self.draw_rectangle(pos, color=self.wall_color)
 
     def erase_rectangle_at_square(self, x: int, y: int) -> None:
         """

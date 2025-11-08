@@ -1,4 +1,5 @@
 import queue
+import sys
 import numpy as np
 import pygame
 
@@ -23,20 +24,23 @@ class MazeApp:
         self.task_queue = queue.Queue()
 
         self.running = False
-        self.screen_size_px = self.maze.maze_size * self.maze.block_size_px
+        self.screen_size_px = self.maze.maze_size * self.block_size_px
 
         self.wall_color = maze.wall_color
         self.path_color = maze.path_color
 
         # Flags for maze generation
-        self.wait_for_space_bar = True
-        self.space_held = False
-        self.space_hold_start_time = 0
-        self.space_hold_threshold = 1000 # in ms
+        self.space_pressed = False          # True while physical key is down
+        self.advance_once = False           # consume single-step trigger
+        self.space_hold_start_time = 0      # ms when keydown happened
+        self.space_hold_threshold = 1000    # ms to hold before auto-run
+        self.last_auto_step_time = 0        # throttle auto stepping (ms)
 
         # Flags for drawing on the window
         self.drawing = False
         self.erasing = False
+
+        self.virtual_surface = pygame.Surface((self.screen_size_px, self.screen_size_px))
 
     def run(self) -> None:
         """
@@ -49,19 +53,26 @@ class MazeApp:
 
         pygame.init()
 
-        self.screen = pygame.display.set_mode(
-            (self.screen_size_px, 
-             self.screen_size_px))
+        self.screen = pygame.display.set_mode((self.screen_size_px, self.screen_size_px), pygame.RESIZABLE)
         
         self.screen.fill(self.wall_color) 
         pygame.display.flip()
+
+        clock = pygame.time.Clock()
 
         while self.running:
             self._handle_tasks()
             self._handle_events()
             self._handle_drawing()
+
+            # Scale virtual surface onto the real screen (letterboxed square viewport)
+            viewport = self.get_square_viewport(self.screen.get_size())
+            scaled = pygame.transform.smoothscale(self.virtual_surface, (viewport.width, viewport.height))
+            self.screen.fill((0, 0, 0))  # black letterbox
+            self.screen.blit(scaled, viewport.topleft)
             
             pygame.display.flip()
+            clock.tick(60)
 
         pygame.quit()
 
@@ -108,42 +119,67 @@ class MazeApp:
                     elif value == 0 and self.maze.grid[row, col] == 1:
                         rectangle_list_to_draw.append((x, y, self.wall_color))
 
-                if rectangle_list_to_draw != []:
+                if rectangle_list_to_draw:
                     self.maze.draw_rectangle_list(rectangle_list_to_draw)
 
                 if show_process:     
                     if by_space_bar:   
-                        while self.wait_for_space_bar:
-                            if self.space_held:
-                                pygame.time.wait(delay_ms)
-                                break
-                            
-                            # Check if space was pressed
-                            for event in pygame.event.get():
-                                if event.type == pygame.KEYDOWN:
-                                    if event.key == pygame.K_SPACE:
-                                        self.space_hold_start_time = pygame.time.get_ticks()
-                                        self.wait_for_space_bar = False
-                            
-                            # Check if space is being held
-                            keys = pygame.key.get_pressed()
-                            if keys[pygame.K_SPACE]:
-                                if not self.space_held:
-                                    held_time = pygame.time.get_ticks() - self.space_hold_start_time
-                                    if held_time >= self.space_hold_threshold:
-                                        self.space_held = True
+                        now = pygame.time.get_ticks()
 
-                        self.wait_for_space_bar = True
+                        if self.space_pressed and (now - self.space_hold_start_time >= self.space_hold_threshold):
+                            if now - self.last_auto_step_time >= delay_ms:
+                                self.last_auto_step_time = now
+                                self.post_task(step)
+                            else:
+                                self.post_task(step)
+                        else:
+                            if self.advance_once:
+                                self.advance_once = False
+                                self.post_task(step)
+                            else:
+                                self.post_task(step)
                     else:
-                        pygame.time.wait(delay_ms)
-                
-                self._handle_exits()
-                self.post_task(step)
+                        now = pygame.time.get_ticks()
+                        if now - self.last_auto_step_time >= delay_ms:
+                            self.last_auto_step_time = now
+                            self.post_task(step)
+                        else:
+                            self.post_task(step)
+                else:
+                    self.post_task(step)
 
             except StopIteration:
                 return
+            
+        self.post_task(step)
+    
+    def get_square_viewport(self, screen_size: tuple[int, int]) -> pygame.Rect:
+        sw, sh = screen_size
+        size = min(sw, sh)
+        x = (sw - size) // 2
+        y = (sh - size) // 2
+        return pygame.Rect(x, y, size, size)
 
-        self.post_task(step)   
+    def scale_mouse_to_virtual(self, event, screen) -> tuple[int, int] | None:
+        """
+        Convert a mouse position on the real screen into grid (cell) integer coordinates on the virtual canvas.
+        """
+        viewport = self.get_square_viewport(screen.get_size())
+        pos = event.pos
+
+        if not viewport.collidepoint(pos):
+            return None
+        
+        # pos within viewport
+        vx = pos[0] - viewport.x
+        vy = pos[1] - viewport.y
+
+        # scale factor from viewport to virtual pixels
+        scale = self.screen_size_px / viewport.width
+        virtual_x = vx * scale
+        virtual_y = vy * scale
+        
+        return (virtual_x, virtual_y)
 
     def _handle_tasks(self) -> None:
         """
@@ -170,44 +206,60 @@ class MazeApp:
                 x, y, (r, g, b) = rect
                 color = (r, g, b)
 
-                pygame.draw.rect(self.screen, 
+                pygame.draw.rect(self.virtual_surface, 
                                     color, 
                                     (x * self.block_size_px,
                                     y * self.block_size_px, 
                                     self.block_size_px, 
                                     self.block_size_px))
 
-    def _handle_exits(self) -> None:
-        """
-        Handles exiting the application.
-        
-        Returns:
-            None
-        """
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                self.running = False
-
     def _handle_events(self) -> None:
         """
-        Handles Pygame events such as quitting, mouse actions, and key presses.
+        Handles Pygame events such as quitting, resizing, mouse actions, and key presses.
         
         Returns:
             None
         """
-        for event in pygame.event.get():
+        events = pygame.event.get()
+        self._handle_screen_events(events=events)
+        self._handle_key_events(events=events)
+
+    def _handle_screen_events(self, events) -> None:
+        """
+        Handles events related to the Pygame window, such as quitting and resizing.
+        
+        Returns:
+            None
+        """
+        for event in events:
             if event.type == pygame.QUIT:
                 self.running = False
-                
-            elif event.type == pygame.MOUSEBUTTONDOWN:
+            elif event.type == pygame.VIDEORESIZE:
+                w, h = event.w, event.h
+                size = int((w + h) / 2)
+                self.screen = pygame.display.set_mode((size, size), pygame.RESIZABLE)
+
+    def _handle_key_events(self, events) -> None:
+        """
+        Handles Pygame events such as mouse actions, and key presses.
+        
+        Returns:
+            None
+        """
+        for event in events:   
+            if event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == 1:
                     self.drawing = True
                     self.erasing = False
-                    self.maze.draw_rectangle(event)
+                    pos = self.scale_mouse_to_virtual(event, self.screen)
+                    if pos is not None:
+                        self.maze.draw_rectangle(pos)
                 elif event.button == 3:
                     self.drawing = False
                     self.erasing = True
-                    self.maze.erase_rectangle(event)
+                    pos = self.scale_mouse_to_virtual(event, self.screen)
+                    if pos is not None:
+                        self.maze.erase_rectangle(pos)
 
             elif event.type == pygame.MOUSEBUTTONUP:
                 self.drawing = False
@@ -215,13 +267,25 @@ class MazeApp:
 
             elif event.type == pygame.MOUSEMOTION:
                 if self.drawing:
-                    self.maze.draw_rectangle(event)
+                    pos = self.scale_mouse_to_virtual(event, self.screen)
+                    if pos is not None:
+                        self.maze.draw_rectangle(pos)
                 if self.erasing:
-                    self.maze.erase_rectangle(event)
+                    pos = self.scale_mouse_to_virtual(event, self.screen)
+                    if pos is not None:
+                        self.maze.erase_rectangle(pos)
+
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_SPACE:
+                    self.space_pressed = True
+                    self.advance_once = True
+                    self.space_hold_start_time = pygame.time.get_ticks()
 
             elif event.type == pygame.KEYUP:
                 if event.key == pygame.K_SPACE:
+                    self.space_pressed = False
+                    self.advance_once = False
                     self.space_hold_start_time = 0
-                    self.space_held = False
+                    self.last_auto_step_time = 0
 
         
