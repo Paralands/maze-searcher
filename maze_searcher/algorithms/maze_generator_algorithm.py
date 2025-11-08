@@ -7,4 +7,5 @@ class MazeGeneratorAlgorithm(Enum):
 
     DFS = auto()
     PRIM = auto()
+    KRUSKAL = auto()
     RANDOM_LINES = auto()

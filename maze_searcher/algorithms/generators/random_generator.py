@@ -13,7 +13,7 @@ class RandomMazeGenerator(MazeGenerator):
         Args:
             maze_size (int): Size of the maze (recommended to be odd).
         """
-        super().__init__(maze_size)
+            
 
     def generate(self) -> Iterator[np.ndarray]:
         """

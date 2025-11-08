@@ -25,6 +25,9 @@ class MazeApp:
         self.running = False
         self.screen_size_px = self.maze.maze_size * self.maze.block_size_px
 
+        self.wall_color = maze.wall_color
+        self.path_color = maze.path_color
+
         # Flags for maze generation
         self.wait_for_space_bar = True
         self.space_held = False
@@ -50,7 +53,7 @@ class MazeApp:
             (self.screen_size_px, 
              self.screen_size_px))
         
-        self.screen.fill((255, 255, 255)) 
+        self.screen.fill(self.wall_color) 
         pygame.display.flip()
 
         while self.running:
@@ -99,11 +102,11 @@ class MazeApp:
                 for (row, col), value in np.ndenumerate(grid):
                     x, y = col, row
                     
-                    # 0 = wall (white), 1 = path (black)
+                    # 0 = wall, 1 = path
                     if value == 1 and self.maze.grid[row, col] == 0:
-                        rectangle_list_to_draw.append((x, y, 0, 0, 0))
+                        rectangle_list_to_draw.append((x, y, self.path_color))
                     elif value == 0 and self.maze.grid[row, col] == 1:
-                        rectangle_list_to_draw.append((x, y, 255, 255, 255))
+                        rectangle_list_to_draw.append((x, y, self.wall_color))
 
                 if rectangle_list_to_draw != []:
                     self.maze.draw_rectangle_list(rectangle_list_to_draw)
@@ -133,7 +136,8 @@ class MazeApp:
                         self.wait_for_space_bar = True
                     else:
                         pygame.time.wait(delay_ms)
-                           
+                
+                self._handle_exits()
                 self.post_task(step)
 
             except StopIteration:
@@ -172,6 +176,17 @@ class MazeApp:
                                     y * self.block_size_px, 
                                     self.block_size_px, 
                                     self.block_size_px))
+
+    def _handle_exits(self) -> None:
+        """
+        Handles exiting the application.
+        
+        Returns:
+            None
+        """
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                self.running = False
 
     def _handle_events(self) -> None:
         """

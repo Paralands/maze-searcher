@@ -32,3 +32,9 @@ class MazeGenerator():
         if(self.type == MazeGeneratorAlgorithm.DFS):
               from .generators import DFSGenerator
               return DFSGenerator(maze_size=self.size).generate()
+        elif(self.type == MazeGeneratorAlgorithm.PRIM):
+              from .generators import PrimGenerator
+              return PrimGenerator(maze_size=self.size).generate()
+        elif(self.type == MazeGeneratorAlgorithm.KRUSKAL):
+              from .generators import KruskalGenerator
+              return KruskalGenerator(maze_size=self.size).generate()

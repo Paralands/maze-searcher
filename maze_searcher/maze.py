@@ -14,12 +14,15 @@ class Maze():
     0 = wall, 1 = path
     Walls are white, paths are black
     """
-    def __init__(self, size: int = 35, block_size_px: int = 20):
+    def __init__(self, size: int = 35, block_size_px: int = 20, wall_color: tuple[int, int, int] = (255, 255, 255), path_color: tuple[int, int, int] = (0, 0, 0)):
         """
         Initializes a Maze object with a specified size.
         
         Args:
-            size (int): Size of the maze in squares (default is 100).
+            size (int): Size of the maze in squares (default is 100)
+            block_size_px (int): Size of each block in pixels (default is 20).
+            wall_color (tuple[int, int, int]): RGB color of the walls (default is white).
+            path_color (tuple[int, int, int]): RGB color of the paths (default is black).
         
         Raises:
             ValueError: If the size is not between 50 and 500 squares.
@@ -31,6 +34,9 @@ class Maze():
 
         #TODO: improve block_size to be proportionate to the screen size
         self.block_size_px = block_size_px 
+
+        self.wall_color = wall_color
+        self.path_color = path_color
 
         # Queues for thread-safe drawing, contains a list of (x, y, (r, g, b)) tuples
         # [x, y]
@@ -128,9 +134,9 @@ class Maze():
             rectangle_list_to_draw = []
 
             if value == 0:
-                rectangle_list_to_draw.append((x, y, 255, 255, 255))
+                rectangle_list_to_draw.append((x, y, self.wall_color))
             elif value == 1:
-                rectangle_list_to_draw.append((x, y, 0, 0, 0))
+                rectangle_list_to_draw.append((x, y, self.path_color))
 
             if rectangle_list_to_draw != []:
                 self.draw_rectangle_list(rectangle_list_to_draw)
@@ -182,8 +188,8 @@ class Maze():
                 possible_moves.append([nx, ny])
 
         return possible_moves
-        
-    def draw_rectangle(self, event, r: int = 255, g: int = 255, b: int = 255) -> None:
+
+    def draw_rectangle(self, event, color: tuple[int, int, int] = (255, 255, 255)) -> None:
         """
         Draws a rectangle at the position of the given event with the specified color and updates the grid.
         
@@ -196,6 +202,7 @@ class Maze():
         Returns:
             None
         """
+        r, g, b = color
         if not 0 <= r <= 255 or not 0 <= g <= 255 or not 0 <= b <= 255:
             raise ValueError("Parametrs r, g, b must be in range of (0, 256)")
 
@@ -204,12 +211,12 @@ class Maze():
 
         self.draw_queue.put([(x // self.block_size_px, y // self.block_size_px, (r, g, b))])
 
-        if (r, g, b) == (0, 0, 0):
+        if (r, g, b) == self.path_color:
             self.grid[row//self.block_size_px, col//self.block_size_px] = 1
-        elif (r, g, b) == (255, 255, 255):
-            self.grid[row//self.block_size_px, col//self.block_size_px] = 0 
-        
-    def draw_rectangle_at_square(self, x: int, y: int, r: int = 255, g: int = 255, b: int = 255) -> None:
+        elif (r, g, b) == self.wall_color:
+            self.grid[row//self.block_size_px, col//self.block_size_px] = 0
+
+    def draw_rectangle_at_square(self, x: int, y: int, color: tuple[int, int, int] = (255, 255, 255)) -> None:
         """
         Draws a rectangle at the specified square coordinates with the given color and updates the grid.
         
@@ -223,16 +230,16 @@ class Maze():
         Returns:
             None
         """
-        
-        self.draw_rectangle_list([(x, y, r, g, b)])
 
-    def draw_rectangle_list(self, rectangles: list[tuple[int, int, int, int, int]]) -> None:
+        self.draw_rectangle_list([(x, y, color)])
+
+    def draw_rectangle_list(self, rectangles: list[tuple[int, int, tuple[int, int, int]]]) -> None:
         """
         Draws multiple rectangles based on the provided list of rectangle specifications.
         
         Args:
-            rectangles (list[tuple[int, int, int, int, int]]): A list of tuples where each tuple contains
-                (x, y, r, g, b) representing the square coordinates and color components
+            rectangles (list[tuple[int, int, tuple[int, int, int]]]): 
+                A list of tuples, each containing the x and y coordinates and the (r, g, b) color of the rectangle.
 
         Returns:
             None
@@ -240,7 +247,8 @@ class Maze():
         rectangles_for_drawing = []
 
         for rect in rectangles:
-            x, y, r, g, b = rect
+            x, y, color = rect
+            r, g, b = color
 
             if not 0 <= r <= 255 or not 0 <= g <= 255 or not 0 <= b <= 255:
                 raise ValueError("Parametrs r, g, b must be in range of (0, 256)")
@@ -252,16 +260,16 @@ class Maze():
 
             row, col = y, x
 
-            if (r, g, b) == (0, 0, 0):
+            if color == self.path_color:
                 self.grid[row,col] = 1  
-            elif (r, g, b) == (255, 255, 255):
+            elif color == self.wall_color:
                 self.grid[row,col] = 0 
 
         self.draw_queue.put(rectangles_for_drawing) 
         
     def erase_rectangle(self, event) -> None:
         """
-        Erases a rectangle at the position of the given event (draws white).
+        Erases a rectangle at the position of the given event (draws wall).
         
         Args:
             event: The pygame event containing the position to erase the rectangle.
@@ -269,11 +277,11 @@ class Maze():
         Returns:
             None
         """
-        self.draw_rectangle(event, 0, 0, 0)
+        self.draw_rectangle(event, color=self.wall_color)
 
     def erase_rectangle_at_square(self, x: int, y: int) -> None:
         """
-        Erases a rectangle at the specified square coordinates (draws white).
+        Erases a rectangle at the specified square coordinates (draws wall).
         
         Args:
             x (int): X coordinate of the square.
@@ -282,4 +290,4 @@ class Maze():
         Returns:
             None
         """
-        self.draw_rectangle_at_square(x, y, 255, 255, 255)
+        self.draw_rectangle_at_square(x, y, color=self.wall_color)
