@@ -30,11 +30,12 @@ class MazeApp:
         self.path_color = maze.path_color
 
         # Flags for maze generation
-        self.space_pressed = False          # True while physical key is down
-        self.advance_once = False           # consume single-step trigger
-        self.space_hold_start_time = 0      # ms when keydown happened
-        self.space_hold_threshold = 1000    # ms to hold before auto-run
-        self.last_auto_step_time = 0        # throttle auto stepping (ms)
+        self.space_pressed = False
+        self.space_hold_start_time = 0
+        self.space_hold_threshold = 1000 
+        self.last_auto_step_time = 0
+        self.space_held = False
+        self.run_next_step = True
 
         # Flags for drawing on the window
         self.drawing = False
@@ -105,54 +106,56 @@ class MazeApp:
 
         def step():
             try:
-                grid = next(generator)
+                if self.run_next_step:
+                    grid = next(generator)
 
-                rectangle_list_to_draw = []
+                    rectangle_list_to_draw = []
 
-                # Check for the grid updates
-                for (row, col), value in np.ndenumerate(grid):
-                    x, y = col, row
-                    
-                    # 0 = wall, 1 = path
-                    if value == 1 and self.maze.grid[row, col] == 0:
-                        rectangle_list_to_draw.append((x, y, self.path_color))
-                    elif value == 0 and self.maze.grid[row, col] == 1:
-                        rectangle_list_to_draw.append((x, y, self.wall_color))
+                    # Check for the grid updates
+                    for (row, col), value in np.ndenumerate(grid):
+                        x, y = col, row
+                        
+                        # 0 = wall, 1 = path
+                        if value == 1 and self.maze.grid[row, col] == 0:
+                            rectangle_list_to_draw.append((x, y, self.path_color))
+                        elif value == 0 and self.maze.grid[row, col] == 1:
+                            rectangle_list_to_draw.append((x, y, self.wall_color))
 
-                if rectangle_list_to_draw:
-                    self.maze.draw_rectangle_list(rectangle_list_to_draw)
+                    if rectangle_list_to_draw:
+                        self.maze.draw_rectangle_list(rectangle_list_to_draw)
 
-                if show_process:     
-                    if by_space_bar:   
-                        now = pygame.time.get_ticks()
+                    self.run_next_step = False
+                    self.last_auto_step_time = pygame.time.get_ticks()
 
-                        if self.space_pressed and (now - self.space_hold_start_time >= self.space_hold_threshold):
-                            if now - self.last_auto_step_time >= delay_ms:
-                                self.last_auto_step_time = now
-                                self.post_task(step)
-                            else:
-                                self.post_task(step)
-                        else:
-                            if self.advance_once:
-                                self.advance_once = False
-                                self.post_task(step)
-                            else:
-                                self.post_task(step)
-                    else:
-                        now = pygame.time.get_ticks()
-                        if now - self.last_auto_step_time >= delay_ms:
-                            self.last_auto_step_time = now
-                            self.post_task(step)
-                        else:
-                            self.post_task(step)
+                now = pygame.time.get_ticks()
+
+                if not show_process:
+                    self.run_next_step = True
+
+                elif by_space_bar:   
+                    # If space bar is held, auto step with delay
+                    if self.space_held and now - self.last_auto_step_time >= delay_ms:
+                        self.last_auto_step_time = now
+                        self.run_next_step = True
+
+                    # Else if space bar was just pressed, advance one step
+                    elif self.space_pressed:
+                        self.run_next_step = True
+                        self.space_pressed = False                  
                 else:
-                    self.post_task(step)
+                    # If not using space bar, auto step with delay
+                    if now - self.last_auto_step_time >= delay_ms:
+                        self.last_auto_step_time = now
+                        self.run_next_step = True
+
+                self.post_task(step)
 
             except StopIteration:
                 return
             
         self.post_task(step)
-    
+            
+        
     def get_square_viewport(self, screen_size: tuple[int, int]) -> pygame.Rect:
         sw, sh = screen_size
         size = min(sw, sh)
@@ -278,14 +281,17 @@ class MazeApp:
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_SPACE:
                     self.space_pressed = True
-                    self.advance_once = True
-                    self.space_hold_start_time = pygame.time.get_ticks()
+                    self.space_hold_start_time = pygame.time.get_ticks()          
 
             elif event.type == pygame.KEYUP:
                 if event.key == pygame.K_SPACE:
                     self.space_pressed = False
-                    self.advance_once = False
+                    self.space_held = False
                     self.space_hold_start_time = 0
                     self.last_auto_step_time = 0
 
-        
+        keys = pygame.key.get_pressed()
+        if keys[pygame.K_SPACE]:
+            now = pygame.time.get_ticks()
+            if(now - self.space_hold_start_time >= self.space_hold_threshold):
+                self.space_held = True 
