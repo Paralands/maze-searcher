@@ -62,54 +62,7 @@ class Maze():
         for grid in grid_generator:
             yield grid
 
-    def randomize(self, strict = True):
-        if strict:
-            self.randomize_strict()
-        else: self.randomize_relaxed()
 
-    def randomize_strict(self, amount = 50):
-        fields = np.zeros((self.maze_size, self.maze_size), dtype=int)
-
-        for n in range(amount):
-            fields = self.draw_random_line(fields)
-
-    def randomize_relaxed(self):
-        fields = np.random.choice([True, False], size=(self.maze_size, self.maze_size))
-
-        for (i,j), value in np.ndenumerate(fields):
-            if value:
-                self.draw_rectangle_at_square(i, j)
-
-    def draw_random_line(self, fields: np.ndarray | None = None, length: int = 1000): 
-        if fields is None:
-            fields = np.zeros((self.maze_size, self.maze_size), dtype=int)
-
-        x = np.random.randint(0, self.maze_size)
-        y = np.random.randint(0, self.maze_size)
-
-        fields[x, y] = 1
-        self.draw_rectangle_at_square(x, y, 255, 255, 255)
-
-        for n in range(length):
-            possible_moves = self._get_possible_moves(fields, x, y)
-
-            if not possible_moves:
-                possible_moves = self._get_possible_moves(fields, x, y, max_neighbours=2)
-
-            if not possible_moves:
-                possible_moves = self._get_possible_moves(fields, x, y, max_neighbours=3)
-
-            if not possible_moves:
-                break
-
-            next_move = np.random.randint(0, len(possible_moves))
-            x, y = possible_moves[next_move]
-            self.draw_rectangle_at_square(x, y)
-            #TODO: delay to visualize the process of setting the grid
-            fields[x, y] = 1
-        
-        return fields
-    
     def size(self) -> int:
         return self.maze_size
     
@@ -159,35 +112,7 @@ class Maze():
             self.set_grid(grid)         
             pygame.time.wait(delay_ms)
 
-    def _count_field_neighbours(self, fields, x, y) -> int:
-        count = 0
 
-        if (x + 1 < len(fields) and fields[x + 1, y] == 1):
-            count += 1
-        if (x - 1 >= 0 and fields[x - 1, y] == 1):
-            count += 1
-        if (y + 1 < len(fields) and fields[x, y + 1] == 1):
-            count += 1
-        if (y - 1 >= 0 and fields[x, y - 1] == 1):
-            count += 1
-
-        return count
-    
-    def _get_possible_moves(self, fields, x, y, max_neighbours=1) -> list[list[int]]:
-        possible_moves = []
-        directions = [(1, 0), (-1, 0), (0, 1), (0, -1)]
-        for dx, dy in directions:
-            nx = x + dx
-            ny = y + dy
-            if (
-                0 <= nx < self.maze_size
-                and 0 <= ny < self.maze_size
-                and fields[nx, ny] == 0
-                and self._count_field_neighbours(fields, nx, ny) <= max_neighbours
-            ): 
-                possible_moves.append([nx, ny])
-
-        return possible_moves
 
     def draw_rectangle(self, pos: tuple[int, int], color: tuple[int, int, int] = (255, 255, 255)) -> None:
         """
