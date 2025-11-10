@@ -41,6 +41,10 @@ class MazeApp:
         self.drawing = False
         self.erasing = False
 
+        # Flags for key presses
+        self.pressed_s = False
+        self.pressed_g = False
+
         self.virtual_surface = pygame.Surface((self.screen_size_px, self.screen_size_px))
 
     def run(self) -> None:
@@ -68,7 +72,7 @@ class MazeApp:
 
             # Scale virtual surface onto the real screen (letterboxed square viewport)
             viewport = self.get_square_viewport(self.screen.get_size())
-            scaled = pygame.transform.smoothscale(self.virtual_surface, (viewport.width, viewport.height))
+            scaled = pygame.transform.scale(self.virtual_surface, (viewport.width, viewport.height))
             self.screen.fill((0, 0, 0))  # black letterbox
             self.screen.blit(scaled, viewport.topleft)
             
@@ -103,6 +107,9 @@ class MazeApp:
             None
         """
         generator = self.maze.generate(type=type)
+
+        if generator is None:
+            return
 
         def step():
             try:
@@ -154,7 +161,45 @@ class MazeApp:
                 return
             
         self.post_task(step)
+    
+    def solve(self) -> None:
+        """
+        Solves the maze using the maze's solve method and visualizes the process.
+
+        Returns:
+            None
+        """
+        solver = self.maze.solve()
+
+        if solver is None:
+            return
+
+        def step():
+            try:
+                grid = next(solver)
+
+                rectangle_list_to_draw = []
+
+                # Check for the grid updates
+                for (row, col), value in np.ndenumerate(grid):
+                    x, y = col, row
+                    
+                    # 0 = wall, 1 = path, 2 = visited, 3 = start, 4 = goal, 5 = solution
+                    if value == 2 and self.maze.grid[row, col] != 2:
+                        rectangle_list_to_draw.append((x, y, self.maze.visited_color))
+
+                    if value == 5 and self.maze.grid[row, col] != 5:
+                        rectangle_list_to_draw.append((x, y, self.maze.solution_color))
+
+                if rectangle_list_to_draw:
+                    self.maze.draw_rectangle_list(rectangle_list_to_draw)
+
+                self.post_task(step)
+
+            except StopIteration:
+                return
             
+        self.post_task(step)
         
     def get_square_viewport(self, screen_size: tuple[int, int]) -> pygame.Rect:
         sw, sh = screen_size
@@ -216,6 +261,23 @@ class MazeApp:
                                     self.block_size_px, 
                                     self.block_size_px))
 
+    def _get_current_color(self):
+        """
+        Returns the color based on the current drawing mode.
+        
+        Returns:
+            tuple[int, int, int]: The RGB color for drawing.
+        """
+        if self.drawing:
+            if self.pressed_s:
+                return self.maze.start_color
+            elif self.pressed_g:
+                return self.maze.goal_color
+            return self.maze.path_color
+        elif self.erasing:
+            return self.maze.wall_color
+        return None
+
     def _handle_events(self) -> None:
         """
         Handles Pygame events such as quitting, resizing, mouse actions, and key presses.
@@ -254,34 +316,43 @@ class MazeApp:
                 if event.button == 1:
                     self.drawing = True
                     self.erasing = False
-                    pos = self.scale_mouse_to_virtual(event, self.screen)
-                    if pos is not None:
-                        self.maze.draw_rectangle(pos)
                 elif event.button == 3:
                     self.drawing = False
                     self.erasing = True
-                    pos = self.scale_mouse_to_virtual(event, self.screen)
-                    if pos is not None:
-                        self.maze.erase_rectangle(pos)
+
+                pos = self.scale_mouse_to_virtual(event, self.screen)
+                if pos is not None:
+                    color = self._get_current_color()
+                    if color is not None:
+                        self.maze.draw_rectangle(pos, color=color)
 
             elif event.type == pygame.MOUSEBUTTONUP:
                 self.drawing = False
                 self.erasing = False
 
             elif event.type == pygame.MOUSEMOTION:
-                if self.drawing:
-                    pos = self.scale_mouse_to_virtual(event, self.screen)
-                    if pos is not None:
-                        self.maze.draw_rectangle(pos)
-                if self.erasing:
-                    pos = self.scale_mouse_to_virtual(event, self.screen)
-                    if pos is not None:
-                        self.maze.erase_rectangle(pos)
+                pos = self.scale_mouse_to_virtual(event, self.screen)
+                if pos is not None:
+                    color = self._get_current_color()
+                    if color is not None:
+                        self.maze.draw_rectangle(pos, color=color)
 
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_SPACE:
                     self.space_pressed = True
-                    self.space_hold_start_time = pygame.time.get_ticks()          
+                    self.space_hold_start_time = pygame.time.get_ticks() 
+
+                # 'S' key for setting start point
+                if event.key == pygame.K_s:
+                    self.pressed_s = True
+
+                # 'G' key for setting goal point
+                if event.key == pygame.K_g:
+                    self.pressed_g = True    
+
+                # 'Y' key for solving the maze using A*
+                if event.key == pygame.K_y:
+                    self.solve()     
 
             elif event.type == pygame.KEYUP:
                 if event.key == pygame.K_SPACE:
@@ -289,6 +360,14 @@ class MazeApp:
                     self.space_held = False
                     self.space_hold_start_time = 0
                     self.last_auto_step_time = 0
+                
+                if event.key == pygame.K_s:
+                    self.pressed_s = False
+                
+                if event.key == pygame.K_g:
+                    self.pressed_g = False
+
+
 
         keys = pygame.key.get_pressed()
         if keys[pygame.K_SPACE]:

@@ -17,5 +17,14 @@ class SolverBase(ABC):
             Iterator[np.ndarray]: The current state of the maze grid at each step.
         """
         pass
+    
+    @abstractmethod
+    def get_solution(self) -> list[tuple[int, int]]:
+        """
+        Get the final solution path as a list of coordinates.
 
+        Returns:
+            list[tuple[int, int]]: The list of coordinates representing the solution path.
+        """
+        pass
         

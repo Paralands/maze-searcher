@@ -14,7 +14,15 @@ class Maze():
     0 = wall, 1 = path
     Walls are white, paths are black
     """
-    def __init__(self, size: int = 35, block_size_px: int = 20, wall_color: tuple[int, int, int] = (255, 255, 255), path_color: tuple[int, int, int] = (0, 0, 0)):
+    def __init__(self, 
+                 size: int = 35, 
+                 block_size_px: int = 20, 
+                 wall_color: tuple[int, int, int] = (0, 0, 0), 
+                 path_color: tuple[int, int, int] = (255, 255, 255),
+                 visited_color: tuple[int, int, int] = (100, 100, 255), 
+                 start_color: tuple[int, int, int] = (0, 255, 0), 
+                 goal_color: tuple[int, int, int] = (255, 0, 0), 
+                 solution_color: tuple[int, int, int] = (255, 255, 0)):
         """
         Initializes a Maze object with a specified size.
         
@@ -23,6 +31,10 @@ class Maze():
             block_size_px (int): Size of each block in pixels (default is 20).
             wall_color (tuple[int, int, int]): RGB color of the walls (default is white).
             path_color (tuple[int, int, int]): RGB color of the paths (default is black).
+            visited_color (tuple[int, int, int]): RGB color of the visited cells (default is light blue).
+            start_color (tuple[int, int, int]): RGB color of the start cell (default is green).
+            goal_color (tuple[int, int, int]): RGB color of the goal cell (default is red).
+            solution_color (tuple[int, int, int]): RGB color of the solution path (default is yellow).
         
         Raises:
             ValueError: If the size is not between 50 and 500 squares.
@@ -32,11 +44,27 @@ class Maze():
 
         self.maze_size = size
 
-        #TODO: improve block_size to be proportionate to the screen size
         self.block_size_px = block_size_px 
+
+        # Colors for different cell types
+        self.colors = {
+            0: wall_color,        # wall (white by default)
+            1: path_color,        # path (black by default)
+            2: visited_color,     # visited (light blue by default)
+            3: start_color,       # start (green by default)
+            4: goal_color,        # goal (red by default)
+            5: solution_color,    # solution (yellow by default)
+        }   
+
+        # Reverse mapping from color to cell value
+        self.color_to_value = {v: k for k, v in self.colors.items()}
 
         self.wall_color = wall_color
         self.path_color = path_color
+        self.visited_color = visited_color
+        self.start_color = start_color
+        self.goal_color = goal_color
+        self.solution_color = solution_color
 
         # Queues for thread-safe drawing, contains a list of (x, y, (r, g, b)) tuples
         # [x, y]
@@ -58,15 +86,33 @@ class Maze():
         """
         self.generator = MazeGenerator(size=self.maze_size, type=type)
         grid_generator = self.generator.generate()
-
+        
         for grid in grid_generator:
             yield grid
 
+    def solve(self) -> Iterator[np.ndarray]:
+        """
+        Solves the maze using the specified algorithm.
+        
+        Returns:
+            An iterator that yields the maze grid at each step of solving, or None if no start/goal found.
+        """
+        from .algorithms.maze_solver import MazeSolver
+        solver = MazeSolver(maze=self)
+        start, goal = self.find_start_and_goal()
+
+        if start and goal:
+            grid_solver = solver.solve(start, goal)
+
+            for grid in grid_solver:
+                yield grid
+
+        return None
 
     def size(self) -> int:
         return self.maze_size
     
-    def set_grid(self, grid: list[list[int]] | np.ndarray, show_process: bool = False) -> None:
+    def set_grid(self, grid: list[list[int]] | np.ndarray) -> None:
         """Sets the maze grid to the provided grid.
         
         Args:
@@ -99,20 +145,24 @@ class Maze():
                     #TODO: delay to visualize the process of setting the grid
                     
         return
+    
+    def find_start_and_goal(self) -> tuple[tuple[int, int], tuple[int, int]]:
+        """
+        Finds the start and goal positions in the maze grid.
 
-    #TODO: fix the show_process functionality
-    def _show_generation_process(self, generator: MazeGenerator, by_space_bar: bool = False, delay_ms: int = 10) -> None:
-        if by_space_bar is None and delay_ms is None:
-            raise ValueError("Either by_space_bar or delay_ms must be provided")
-        
-        if not self.generator:
-            return 
-        
-        for grid in generator.generate():
-            self.set_grid(grid)         
-            pygame.time.wait(delay_ms)
+        Returns:
+            tuple[tuple[int, int], tuple[int, int]]: The (row, col) coordinates of the start and goal positions.
+        """
+        start = None
+        goal = None
 
+        for (row, col), value in np.ndenumerate(self.grid):
+            if value == 3:  # start
+                start = (row, col)
+            elif value == 4:  # goal
+                goal = (row, col)
 
+        return start, goal
 
     def draw_rectangle(self, pos: tuple[int, int], color: tuple[int, int, int] = (255, 255, 255)) -> None:
         """
@@ -128,18 +178,26 @@ class Maze():
             None
         """
         r, g, b = color
+        x, y = pos
+        row, col = int(y // self.block_size_px), int(x // self.block_size_px)
+
         if not 0 <= r <= 255 or not 0 <= g <= 255 or not 0 <= b <= 255:
             raise ValueError("Parametrs r, g, b must be in range of (0, 256)")
 
-        x, y = pos
-        row, col = int(y), int(x)
+        if not (0 <= y // self.block_size_px < self.maze_size and 0 <= x // self.block_size_px < self.maze_size):
+            raise ValueError("Parametrs x and y must be in range of the maze size")
+
+        current_value = self.grid[row, col]
+        new_value = self.color_to_value.get(color, current_value)
+
+        # Skip if the value is the same
+        if new_value == current_value:
+            return
 
         self.draw_queue.put([(x // self.block_size_px, y // self.block_size_px, (r, g, b))])
 
-        if (r, g, b) == self.path_color:
-            self.grid[row//self.block_size_px, col//self.block_size_px] = 1
-        elif (r, g, b) == self.wall_color:
-            self.grid[row//self.block_size_px, col//self.block_size_px] = 0
+        if current_value is not None:
+            self.grid[row, col] = new_value
 
     def draw_rectangle_at_square(self, x: int, y: int, color: tuple[int, int, int] = (255, 255, 255)) -> None:
         """
@@ -148,9 +206,7 @@ class Maze():
         Args:
             x (int): X coordinate of the square.
             y (int): Y coordinate of the square.
-            r (int): Red component of the color (0-255).
-            g (int): Green component of the color (0-255).
-            b (int): Blue component of the color (0-255).
+            color (tuple[int, int, int]): RGB color of the rectangle, default is white (for wall).
         
         Returns:
             None
@@ -174,6 +230,7 @@ class Maze():
         for rect in rectangles:
             x, y, color = rect
             r, g, b = color
+            row, col = y, x
 
             if not 0 <= r <= 255 or not 0 <= g <= 255 or not 0 <= b <= 255:
                 raise ValueError("Parametrs r, g, b must be in range of (0, 256)")
@@ -181,14 +238,17 @@ class Maze():
             if not (0 <= x < self.maze_size and 0 <= y < self.maze_size):
                 raise ValueError("Parametrs x and y must be in range of the maze size")
             
-            rectangles_for_drawing.append((x, y, (r, g, b)))
+            current_value = self.grid[row, col]
+            new_value = self.color_to_value.get(color, current_value)
 
-            row, col = y, x
+            # Skip if the value is the same
+            if new_value == current_value:
+                return
+            
+            rectangles_for_drawing.append((x, y, (r, g, b)))     
 
-            if color == self.path_color:
-                self.grid[row,col] = 1  
-            elif color == self.wall_color:
-                self.grid[row,col] = 0 
+            if new_value is not None:
+                self.grid[row, col] = new_value
 
         self.draw_queue.put(rectangles_for_drawing) 
         
