@@ -6,7 +6,6 @@ import pygame
 from .algorithms import MazeGeneratorAlgorithm
 from .maze import Maze
 
-
 class MazeApp:
     """
     MazeApp class responsible for running the maze application with Pygame.
@@ -20,14 +19,26 @@ class MazeApp:
             maze (Maze): The maze to be visualized and interacted with.
         """
         self.maze: Maze = maze
-        self.block_size_px = maze.block_size_px
+
         self.task_queue = queue.Queue()
 
         self.running = False
-        self.screen_size_px = self.maze.maze_size * self.block_size_px
 
+        # Screen and drawing parameters, will be set in run()
+        self.screen_size_px = self.maze.block_size_px * self.maze.maze_size
+        self.block_size_px = self.maze.block_size_px
+
+        # Colors
         self.wall_color = maze.wall_color
         self.path_color = maze.path_color
+        self.visited_color = maze.visited_color
+        self.start_color = maze.start_color
+        self.goal_color = maze.goal_color
+        self.solution_color = maze.solution_color
+
+        # Flags for maze solving
+        self.generating = False
+        self.solving = False
 
         # Flags for maze generation
         self.space_pressed = False
@@ -46,7 +57,7 @@ class MazeApp:
         self.pressed_g = False
 
         self.virtual_surface = pygame.Surface((self.screen_size_px, self.screen_size_px))
-
+    
     def run(self) -> None:
         """
         Starts the Pygame application and runs the main loop.
@@ -58,6 +69,7 @@ class MazeApp:
 
         pygame.init()
 
+        self.set_block_size_px()
         self.screen = pygame.display.set_mode((self.screen_size_px, self.screen_size_px), pygame.RESIZABLE)
         
         self.screen.fill(self.wall_color) 
@@ -80,6 +92,25 @@ class MazeApp:
             clock.tick(60)
 
         pygame.quit()
+
+    def set_block_size_px(self) -> None:
+        """
+        Sets the block size in pixels to fit the maze within 85% of the screen's smaller dimension.
+        Must be called after pygame.init() before using the MazeApp.
+
+        Returns:
+            None
+        """
+        info = pygame.display.Info()
+
+        screen_width = info.current_w
+        screen_height = info.current_h
+        self.maze.set_block_size_px((min(screen_width * 0.85, screen_height * 0.85) // self.maze.maze_size) )
+        
+        # Setting essential parameters
+        self.block_size_px = self.maze.block_size_px
+        self.screen_size_px = self.maze.maze_size * self.block_size_px
+        self.virtual_surface = pygame.Surface((self.screen_size_px, self.screen_size_px))
 
     def post_task(self, task) -> None:
         """
@@ -186,13 +217,16 @@ class MazeApp:
                     
                     # 0 = wall, 1 = path, 2 = visited, 3 = start, 4 = goal, 5 = solution
                     if value == 2 and self.maze.grid[row, col] != 2:
-                        rectangle_list_to_draw.append((x, y, self.maze.visited_color))
+                        rectangle_list_to_draw.append((x, y, self.visited_color))
 
                     if value == 5 and self.maze.grid[row, col] != 5:
-                        rectangle_list_to_draw.append((x, y, self.maze.solution_color))
+                        rectangle_list_to_draw.append((x, y, self.solution_color))
 
                 if rectangle_list_to_draw:
                     self.maze.draw_rectangle_list(rectangle_list_to_draw)
+
+                #TODO: Add delay or step control if needed based on delay_ms or by_space_bar
+                
 
                 self.post_task(step)
 

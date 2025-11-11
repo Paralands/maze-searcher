@@ -22,7 +22,7 @@ class Maze():
                  visited_color: tuple[int, int, int] = (100, 100, 255), 
                  start_color: tuple[int, int, int] = (0, 255, 0), 
                  goal_color: tuple[int, int, int] = (255, 0, 0), 
-                 solution_color: tuple[int, int, int] = (255, 255, 0)):
+                 solution_color: tuple[int, int, int] = (128, 128, 0)):
         """
         Initializes a Maze object with a specified size.
         
@@ -53,7 +53,7 @@ class Maze():
             2: visited_color,     # visited (light blue by default)
             3: start_color,       # start (green by default)
             4: goal_color,        # goal (red by default)
-            5: solution_color,    # solution (yellow by default)
+            5: solution_color,    # solution (olive by default)
         }   
 
         # Reverse mapping from color to cell value
@@ -73,6 +73,18 @@ class Maze():
         # [row, col]
         # 0 = wall, 1 = path
         self.grid = np.zeros((self.maze_size, self.maze_size), dtype=int)  
+
+    def set_block_size_px(self, block_size_px: int) -> None:
+        """
+        Sets the block size in pixels.
+        
+        Args:
+            block_size_px (int): Size of each block in pixels.
+
+        Returns:
+            None
+        """
+        self.block_size_px = block_size_px
         
     def generate(self, type: MazeGeneratorAlgorithm = MazeGeneratorAlgorithm.DFS) -> Iterator[np.ndarray]:
         """
@@ -139,11 +151,7 @@ class Maze():
 
             if rectangle_list_to_draw != []:
                 self.draw_rectangle_list(rectangle_list_to_draw)
-                
-                #TODO: save the grid in self.grid
-                #if (show_process):
-                    #TODO: delay to visualize the process of setting the grid
-                    
+
         return
     
     def find_start_and_goal(self) -> tuple[tuple[int, int], tuple[int, int]]:
