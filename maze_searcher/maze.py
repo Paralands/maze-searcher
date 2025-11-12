@@ -1,12 +1,10 @@
 import queue
 from typing import Iterator
-import pygame
 import numpy as np
 
 from .algorithms import MazeGenerator
 from .algorithms import MazeGeneratorAlgorithm
-
-#TODO: catch exceptions in maze running and generating like stack overflow etc.
+from .algorithms.maze_solver import MazeSolver
 
 class Maze():
     """
@@ -96,11 +94,14 @@ class Maze():
         Returns:
             An iterator that yields the maze grid at each step of generation.
         """
-        self.generator = MazeGenerator(size=self.maze_size, type=type)
-        grid_generator = self.generator.generate()
-        
-        for grid in grid_generator:
-            yield grid
+        try:
+            self.generator = MazeGenerator(size=self.maze_size, type=type)
+            grid_generator = self.generator.generate()
+            
+            for grid in grid_generator:
+                yield grid
+        except Exception as e:
+            print(f"Error during maze generation: {e}")
 
     def solve(self) -> Iterator[np.ndarray]:
         """
@@ -109,19 +110,39 @@ class Maze():
         Returns:
             An iterator that yields the maze grid at each step of solving, or None if no start/goal found.
         """
-        from .algorithms.maze_solver import MazeSolver
-        solver = MazeSolver(maze=self)
-        start, goal = self.find_start_and_goal()
+        try:
+            solver = MazeSolver(maze=self)
+            start, goal = self.find_start_and_goal()
 
-        if start and goal:
-            grid_solver = solver.solve(start, goal)
+            if start and goal:
+                grid_solver = solver.solve(start, goal)
 
-            for grid in grid_solver:
-                yield grid
+                for grid in grid_solver:
+                    yield grid
+
+        except Exception as e:
+            print(f"Error during maze solving: {e}")
 
         return None
+    
+    def reset(self) -> None:
+        """
+        Resets the maze grid to all walls.
+
+        Returns:
+            None
+        """
+        self.grid = np.ones((self.maze_size, self.maze_size), dtype=int)  
+        self.draw_queue.put([(x, y, self.path_color) for x in range(self.maze_size) for y in range(self.maze_size)])
 
     def size(self) -> int:
+        """
+        Returns the size of the maze.
+
+        Returns:
+            int: The size of the maze.
+        """
+
         return self.maze_size
     
     def set_grid(self, grid: list[list[int]] | np.ndarray) -> None:
@@ -154,6 +175,46 @@ class Maze():
 
         return
     
+    def set_start(self, row: int, col: int) -> None:
+        """
+        Sets the start position in the maze grid.
+
+        Args:
+            row (int): The row index of the start position.
+            col (int): The column index of the start position.
+
+        Returns:
+            None
+        """
+
+        for (r, c), value in np.ndenumerate(self.grid):
+            if value == 3:  # start
+                self.grid[r, c] = 1  # reset previous start to path
+                self.draw_queue.put([(c, r, self.path_color)])
+
+        self.grid[row, col] = 3  # set new start
+        self.draw_queue.put([(col, row, self.start_color)])
+
+    def set_goal(self, row: int, col: int) -> None:
+        """
+        Sets the goal position in the maze grid.
+
+        Args:
+            row (int): The row index of the goal position.
+            col (int): The column index of the goal position.
+
+        Returns:
+            None
+        """
+
+        for (r, c), value in np.ndenumerate(self.grid):
+            if value == 4:  # goal
+                self.grid[r, c] = 1  # reset previous goal to path
+                self.draw_queue.put([(c, r, self.path_color)])
+
+        self.grid[row, col] = 4  # set new goal
+        self.draw_queue.put([(col, row, self.goal_color)])
+
     def find_start_and_goal(self) -> tuple[tuple[int, int], tuple[int, int]]:
         """
         Finds the start and goal positions in the maze grid.
@@ -200,6 +261,14 @@ class Maze():
 
         # Skip if the value is the same
         if new_value == current_value:
+            return
+        
+        if new_value == 3:  # start
+            self.set_start(row, col)
+            return
+        
+        if new_value == 4:  # goal
+            self.set_goal(row, col)
             return
 
         self.draw_queue.put([(x // self.block_size_px, y // self.block_size_px, (r, g, b))])
@@ -252,6 +321,12 @@ class Maze():
             # Skip if the value is the same
             if new_value == current_value:
                 return
+            
+            if new_value == 3:  # start
+                self.set_start(row, col)
+            
+            if new_value == 4:  # goal
+                self.set_goal(row, col)
             
             rectangles_for_drawing.append((x, y, (r, g, b)))     
 

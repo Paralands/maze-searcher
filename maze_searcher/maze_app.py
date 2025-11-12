@@ -11,12 +11,13 @@ class MazeApp:
     MazeApp class responsible for running the maze application with Pygame.
     """
 
-    def __init__(self, maze: Maze):
+    def __init__(self, maze: Maze, default_delay_ms: int = 25) -> None:
         """
         Initializes a MazeApp object with the specified maze.
         
         Args:
             maze (Maze): The maze to be visualized and interacted with.
+            default_delay_ms (int): Default delay in milliseconds for generation/solving steps (default is 50).
         """
         self.maze: Maze = maze
 
@@ -36,17 +37,22 @@ class MazeApp:
         self.goal_color = maze.goal_color
         self.solution_color = maze.solution_color
 
-        # Flags for maze solving
-        self.generating = False
+        # Flags for maze solving and generation
         self.solving = False
+        self.generating = False
+        self.run_next_step = True
 
-        # Flags for maze generation
+        # Flags and parameters for step delays
+        self.delay_ms = default_delay_ms
+        self.wait_for_space = False
         self.space_pressed = False
+        self.space_held = False
+        self.control_pressed = False
         self.space_hold_start_time = 0
         self.space_hold_threshold = 1000 
         self.last_auto_step_time = 0
-        self.space_held = False
-        self.run_next_step = True
+        self.last_ctrl_combo_time = 0
+        self.ctrl_combo_cooldown = 200  
 
         # Flags for drawing on the window
         self.drawing = False
@@ -124,26 +130,29 @@ class MazeApp:
         """
         self.task_queue.put(task) 
 
-    def generate(self, type: MazeGeneratorAlgorithm = MazeGeneratorAlgorithm.DFS, show_process: bool = False, by_space_bar: bool = False, delay_ms: int = 50) -> None:
+    def generate(self, type: MazeGeneratorAlgorithm = MazeGeneratorAlgorithm.DFS, delay_ms: int = 25, show_process: bool = True) -> None:
         """
         Generates the maze using the specified algorithm and visualizes the process. 
 
         Args:
             type (MazeGeneratorAlgorithm): The maze generation algorithm to use (default is DFS).
-            show_process (bool): If True, visualizes the process of generation (default is False).
-            by_space_bar (bool): If True, advances the generation step by step using the space bar, and makes it automatic with the delay if the space bar is held (default is False)
-            delay_ms (int): Delay in milliseconds between steps when not using space bar (default is 10), used to delay faster generation if by_space_bar is True.
+            delay_ms (int): Delay in milliseconds between steps (default is 25).
+            show_process (bool): Whether to visualize the generation process (default is True).
 
         Returns:
             None
         """
         generator = self.maze.generate(type=type)
+        self.generating = True
 
         if generator is None:
             return
 
         def step():
             try:
+                if not self.generating:
+                    return
+
                 if self.run_next_step:
                     grid = next(generator)
 
@@ -165,26 +174,10 @@ class MazeApp:
                     self.run_next_step = False
                     self.last_auto_step_time = pygame.time.get_ticks()
 
-                now = pygame.time.get_ticks()
-
-                if not show_process:
-                    self.run_next_step = True
-
-                elif by_space_bar:   
-                    # If space bar is held, auto step with delay
-                    if self.space_held and now - self.last_auto_step_time >= delay_ms:
-                        self.last_auto_step_time = now
-                        self.run_next_step = True
-
-                    # Else if space bar was just pressed, advance one step
-                    elif self.space_pressed:
-                        self.run_next_step = True
-                        self.space_pressed = False                  
+                if show_process:
+                    self._check_for_delay(delay_ms)
                 else:
-                    # If not using space bar, auto step with delay
-                    if now - self.last_auto_step_time >= delay_ms:
-                        self.last_auto_step_time = now
-                        self.run_next_step = True
+                    self.run_next_step = True
 
                 self.post_task(step)
 
@@ -201,39 +194,87 @@ class MazeApp:
             None
         """
         solver = self.maze.solve()
+        self.solving = True
 
         if solver is None:
             return
 
         def step():
             try:
-                grid = next(solver)
+                if not self.solving:
+                    return
 
-                rectangle_list_to_draw = []
+                if self.run_next_step:
+                    grid = next(solver)
 
-                # Check for the grid updates
-                for (row, col), value in np.ndenumerate(grid):
-                    x, y = col, row
-                    
-                    # 0 = wall, 1 = path, 2 = visited, 3 = start, 4 = goal, 5 = solution
-                    if value == 2 and self.maze.grid[row, col] != 2:
-                        rectangle_list_to_draw.append((x, y, self.visited_color))
+                    rectangle_list_to_draw = []
 
-                    if value == 5 and self.maze.grid[row, col] != 5:
-                        rectangle_list_to_draw.append((x, y, self.solution_color))
+                    # Check for the grid updates
+                    for (row, col), value in np.ndenumerate(grid):
+                        x, y = col, row
+                        
+                        # 0 = wall, 1 = path, 2 = visited, 3 = start, 4 = goal, 5 = solution
+                        if value == 2 and self.maze.grid[row, col] != 2:
+                            rectangle_list_to_draw.append((x, y, self.visited_color))
 
-                if rectangle_list_to_draw:
-                    self.maze.draw_rectangle_list(rectangle_list_to_draw)
+                        if value == 5 and self.maze.grid[row, col] != 5:
+                            rectangle_list_to_draw.append((x, y, self.solution_color))
 
-                #TODO: Add delay or step control if needed based on delay_ms or by_space_bar
-                
+                    if rectangle_list_to_draw:
+                        self.maze.draw_rectangle_list(rectangle_list_to_draw)
 
+                    self.run_next_step = False
+                    self.last_auto_step_time = pygame.time.get_ticks()
+
+                self._check_for_delay(self.delay_ms)
                 self.post_task(step)
 
             except StopIteration:
                 return
             
         self.post_task(step)
+
+    def _check_for_delay(self, delay_ms) -> None:
+        """
+        Checks if the specified delay has passed and updates the run_next_step flag accordingly.
+        Args:
+            delay_ms (int): The delay in milliseconds.
+        Returns:
+            None
+        """
+        now = pygame.time.get_ticks()
+
+        if self.wait_for_space:   
+            # If space bar is held, auto step with delay
+            if self.space_held and now - self.last_auto_step_time >= delay_ms:
+                self.last_auto_step_time = now
+                self.run_next_step = True
+
+            # Else if space bar was just pressed, advance one step
+            elif self.space_pressed:
+                self.run_next_step = True
+                self.space_pressed = False
+        elif self.space_pressed:
+            self.run_next_step = True
+            self.space_pressed = False
+            self.wait_for_space = True                  
+        else:
+            # Default to auto step with delay
+            if now - self.last_auto_step_time >= delay_ms:
+                self.last_auto_step_time = now
+                self.run_next_step = True
+
+    def reset(self) -> None:
+        """
+        Resets the maze to its initial state.
+
+        Returns:
+            None
+        """
+        self.solving = False
+        self.generating = False
+        self.maze.reset()
+        
         
     def get_square_viewport(self, screen_size: tuple[int, int]) -> pygame.Rect:
         sw, sh = screen_size
@@ -307,9 +348,9 @@ class MazeApp:
                 return self.maze.start_color
             elif self.pressed_g:
                 return self.maze.goal_color
-            return self.maze.path_color
-        elif self.erasing:
             return self.maze.wall_color
+        elif self.erasing:
+            return self.maze.path_color
         return None
 
     def _handle_events(self) -> None:
@@ -345,6 +386,8 @@ class MazeApp:
         Returns:
             None
         """
+        pressed_keys = set()
+
         for event in events:   
             if event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == 1:
@@ -372,6 +415,8 @@ class MazeApp:
                         self.maze.draw_rectangle(pos, color=color)
 
             elif event.type == pygame.KEYDOWN:
+                pressed_keys.add(event.key)
+
                 if event.key == pygame.K_SPACE:
                     self.space_pressed = True
                     self.space_hold_start_time = pygame.time.get_ticks() 
@@ -388,7 +433,32 @@ class MazeApp:
                 if event.key == pygame.K_y:
                     self.solve()     
 
+                # 'R' key for resetting the maze
+                if event.key == pygame.K_r:
+                    self.reset()
+                    
+
+                # Ctrl + D/K/P for generating maze with different algorithms
+                now = pygame.time.get_ticks()
+                if self.control_pressed and (now - self.last_ctrl_combo_time > self.ctrl_combo_cooldown):
+                    if event.key == pygame.K_d:
+                        self.reset()
+                        self.generate(type=MazeGeneratorAlgorithm.DFS, show_process=True)
+                        self.last_ctrl_combo_time = now
+
+                    elif event.key == pygame.K_k:
+                        self.reset()
+                        self.generate(type=MazeGeneratorAlgorithm.KRUSKAL, show_process=True)
+                        self.last_ctrl_combo_time = now
+
+                    elif event.key == pygame.K_p:
+                        self.reset()
+                        self.generate(type=MazeGeneratorAlgorithm.PRIM, show_process=True)
+                        self.last_ctrl_combo_time = now
+
             elif event.type == pygame.KEYUP:
+                pressed_keys.discard(event.key)
+
                 if event.key == pygame.K_SPACE:
                     self.space_pressed = False
                     self.space_held = False
@@ -401,10 +471,17 @@ class MazeApp:
                 if event.key == pygame.K_g:
                     self.pressed_g = False
 
-
-
         keys = pygame.key.get_pressed()
         if keys[pygame.K_SPACE]:
             now = pygame.time.get_ticks()
             if(now - self.space_hold_start_time >= self.space_hold_threshold):
                 self.space_held = True 
+        else:
+            self.space_held = False
+        
+        if keys[pygame.K_LCTRL] or keys[pygame.K_RCTRL]:
+            self.control_pressed = True
+        else:
+            self.control_pressed = False
+            self.last_ctrl_combo_time = 0
+    
