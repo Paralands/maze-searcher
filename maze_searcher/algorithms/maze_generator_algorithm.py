@@ -4,7 +4,6 @@ class MazeGeneratorAlgorithm(Enum):
     """
     Enumeration of maze generation algorithms.
     """
-
     DFS = auto()
     PRIM = auto()
     KRUSKAL = auto()

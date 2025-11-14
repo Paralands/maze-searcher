@@ -18,7 +18,9 @@ class RandomLinesGenerator(MazeGenerator):
     def generate(self) -> Iterator[np.ndarray]:
         """
         Generate a maze using a simple random walk algorithm.
-        Yields each intermediate maze state (np.ndarray).
+        
+        Yields:
+            np.ndarray: The maze grid at each step of generation.
         """
         fields = np.zeros((self.maze_size, self.maze_size), dtype=int)
 

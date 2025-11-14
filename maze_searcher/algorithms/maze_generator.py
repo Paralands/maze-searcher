@@ -41,3 +41,5 @@ class MazeGenerator():
         elif(self.type == MazeGeneratorAlgorithm.RANDOM_LINES):
             from .generators import RandomLinesGenerator
             return RandomLinesGenerator(maze_size=self.size).generate()
+        else:
+            raise NotImplementedError(f"Generate method for {self.type} is not implemented yet.")

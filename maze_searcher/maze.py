@@ -2,6 +2,8 @@ import queue
 from typing import Iterator
 import numpy as np
 
+from maze_searcher.algorithms.maze_solver_algorithm import MazeSolverAlgorithm
+
 from .algorithms import MazeGenerator
 from .algorithms import MazeGeneratorAlgorithm
 from .algorithms.maze_solver import MazeSolver
@@ -9,8 +11,6 @@ from .algorithms.maze_solver import MazeSolver
 class Maze():
     """
     Maze class representing a maze structure and providing methods to manipulate it.
-    0 = wall, 1 = path
-    Walls are white, paths are black
     """
     def __init__(self, 
                  size: int = 35, 
@@ -103,7 +103,7 @@ class Maze():
         except Exception as e:
             print(f"Error during maze generation: {e}")
 
-    def solve(self) -> Iterator[np.ndarray]:
+    def solve(self, type: MazeSolverAlgorithm = MazeSolverAlgorithm.ASTAR) -> Iterator[np.ndarray]:
         """
         Solves the maze using the specified algorithm.
         
@@ -111,7 +111,7 @@ class Maze():
             An iterator that yields the maze grid at each step of solving, or None if no start/goal found.
         """
         try:
-            solver = MazeSolver(maze=self)
+            solver = MazeSolver(grid=self.grid, type=type)
             start, goal = self.find_start_and_goal()
 
             if start and goal:
@@ -134,6 +134,22 @@ class Maze():
         """
         self.grid = np.ones((self.maze_size, self.maze_size), dtype=int)  
         self.draw_queue.put([(x, y, self.path_color) for x in range(self.maze_size) for y in range(self.maze_size)])
+
+    def clear_solving(self) -> None:
+        """
+        Clears the solving path and visited cells from the maze grid.
+
+        Returns:
+            None
+        """
+        rectangles=[]
+
+        for (row, col), value in np.ndenumerate(self.grid):
+            if value == 2 or value == 5:  # visited or solution
+                self.grid[row, col] = 1  # reset to path
+                rectangles.append((col, row, self.path_color))
+        
+        self.draw_queue.put(rectangles)
 
     def size(self) -> int:
         """

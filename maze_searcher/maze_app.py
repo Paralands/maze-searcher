@@ -1,14 +1,23 @@
 import queue
-import sys
 import numpy as np
 import pygame
 
 from .algorithms import MazeGeneratorAlgorithm
+from .algorithms.maze_solver_algorithm import MazeSolverAlgorithm
 from .maze import Maze
 
 class MazeApp:
     """
     MazeApp class responsible for running the maze application with Pygame.
+
+    Public Methods:
+        - __init__(maze: Maze, default_delay_ms: int = 25) -> None
+        - run() -> None
+        - post_task(task) -> None
+        - generate(type: MazeGeneratorAlgorithm = MazeGeneratorAlgorithm.DFS, delay_ms: int = 25, show_process: bool = True) -> None
+        - solve() -> None
+        - reset() -> None
+        - stop_animation() -> None
     """
 
     def __init__(self, maze: Maze, default_delay_ms: int = 25) -> None:
@@ -75,7 +84,7 @@ class MazeApp:
 
         pygame.init()
 
-        self.set_block_size_px()
+        self._set_block_size_px()
         self.screen = pygame.display.set_mode((self.screen_size_px, self.screen_size_px), pygame.RESIZABLE)
         
         self.screen.fill(self.wall_color) 
@@ -89,7 +98,7 @@ class MazeApp:
             self._handle_drawing()
 
             # Scale virtual surface onto the real screen (letterboxed square viewport)
-            viewport = self.get_square_viewport(self.screen.get_size())
+            viewport = self._get_square_viewport(self.screen.get_size())
             scaled = pygame.transform.scale(self.virtual_surface, (viewport.width, viewport.height))
             self.screen.fill((0, 0, 0))  # black letterbox
             self.screen.blit(scaled, viewport.topleft)
@@ -98,25 +107,6 @@ class MazeApp:
             clock.tick(60)
 
         pygame.quit()
-
-    def set_block_size_px(self) -> None:
-        """
-        Sets the block size in pixels to fit the maze within 85% of the screen's smaller dimension.
-        Must be called after pygame.init() before using the MazeApp.
-
-        Returns:
-            None
-        """
-        info = pygame.display.Info()
-
-        screen_width = info.current_w
-        screen_height = info.current_h
-        self.maze.set_block_size_px((min(screen_width * 0.85, screen_height * 0.85) // self.maze.maze_size) )
-        
-        # Setting essential parameters
-        self.block_size_px = self.maze.block_size_px
-        self.screen_size_px = self.maze.maze_size * self.block_size_px
-        self.virtual_surface = pygame.Surface((self.screen_size_px, self.screen_size_px))
 
     def post_task(self, task) -> None:
         """
@@ -128,6 +118,9 @@ class MazeApp:
         Returns:
             None
         """
+        if not callable(task):
+            raise ValueError("Task must be a callable function or method.")
+
         self.task_queue.put(task) 
 
     def generate(self, type: MazeGeneratorAlgorithm = MazeGeneratorAlgorithm.DFS, delay_ms: int = 25, show_process: bool = True) -> None:
@@ -142,6 +135,7 @@ class MazeApp:
         Returns:
             None
         """
+        self.reset()
         generator = self.maze.generate(type=type)
         self.generating = True
 
@@ -186,14 +180,20 @@ class MazeApp:
             
         self.post_task(step)
     
-    def solve(self) -> None:
+    def solve(self, type: MazeSolverAlgorithm = MazeSolverAlgorithm.ASTAR) -> None:
         """
         Solves the maze using the maze's solve method and visualizes the process.
+
+        Args:
+            type (MazeSolverAlgorithm): The maze solving algorithm to use (default is A*).
 
         Returns:
             None
         """
-        solver = self.maze.solve()
+        self.stop_animation()
+        self.maze.clear_solving()
+        
+        solver = self.maze.solve(type=type)
         self.solving = True
 
         if solver is None:
@@ -234,6 +234,41 @@ class MazeApp:
             
         self.post_task(step)
 
+    def reset(self) -> None:
+        """
+        Resets the maze to its initial state.
+
+        Returns:
+            None
+        """
+        self.stop_animation()
+        self.maze.reset()
+
+    def stop_animation(self) -> None:
+        """
+        Stops any ongoing maze generation or solving animation.
+
+        Returns:
+            None
+        """
+        self.solving = False
+        self.generating = False
+        self.wait_for_space = False
+        self._clear_task_queue()
+    
+    def _clear_task_queue(self) -> None:
+        """
+        Clears all pending tasks from the task queue.
+
+        Returns:
+            None
+        """
+        while not self.task_queue.empty():
+            try:
+                self.task_queue.get_nowait()
+            except queue.Empty:
+                break
+
     def _check_for_delay(self, delay_ms) -> None:
         """
         Checks if the specified delay has passed and updates the run_next_step flag accordingly.
@@ -264,30 +299,37 @@ class MazeApp:
                 self.last_auto_step_time = now
                 self.run_next_step = True
 
-    def reset(self) -> None:
+    def _set_block_size_px(self) -> None:
         """
-        Resets the maze to its initial state.
+        Sets the block size in pixels to fit the maze within 85% of the screen's smaller dimension.
+        Must be called after pygame.init() before using the MazeApp.
 
         Returns:
             None
         """
-        self.solving = False
-        self.generating = False
-        self.maze.reset()
+        info = pygame.display.Info()
+
+        screen_width = info.current_w
+        screen_height = info.current_h
+        self.maze.set_block_size_px((min(screen_width * 0.85, screen_height * 0.85) // self.maze.maze_size) )
         
-        
-    def get_square_viewport(self, screen_size: tuple[int, int]) -> pygame.Rect:
+        # Setting essential parameters
+        self.block_size_px = self.maze.block_size_px
+        self.screen_size_px = self.maze.maze_size * self.block_size_px
+        self.virtual_surface = pygame.Surface((self.screen_size_px, self.screen_size_px))
+
+    def _get_square_viewport(self, screen_size: tuple[int, int]) -> pygame.Rect:
         sw, sh = screen_size
         size = min(sw, sh)
         x = (sw - size) // 2
         y = (sh - size) // 2
         return pygame.Rect(x, y, size, size)
 
-    def scale_mouse_to_virtual(self, event, screen) -> tuple[int, int] | None:
+    def _scale_mouse_to_virtual(self, event, screen) -> tuple[int, int] | None:
         """
         Convert a mouse position on the real screen into grid (cell) integer coordinates on the virtual canvas.
         """
-        viewport = self.get_square_viewport(screen.get_size())
+        viewport = self._get_square_viewport(screen.get_size())
         pos = event.pos
 
         if not viewport.collidepoint(pos):
@@ -303,6 +345,23 @@ class MazeApp:
         virtual_y = vy * scale
         
         return (virtual_x, virtual_y)
+    
+    def _get_current_color(self):
+        """
+        Returns the color based on the current drawing mode.
+        
+        Returns:
+            tuple[int, int, int]: The RGB color for drawing.
+        """
+        if self.drawing:
+            if self.pressed_s:
+                return self.maze.start_color
+            elif self.pressed_g:
+                return self.maze.goal_color
+            return self.maze.wall_color
+        elif self.erasing:
+            return self.maze.path_color
+        return None
 
     def _handle_tasks(self) -> None:
         """
@@ -335,23 +394,6 @@ class MazeApp:
                                     y * self.block_size_px, 
                                     self.block_size_px, 
                                     self.block_size_px))
-
-    def _get_current_color(self):
-        """
-        Returns the color based on the current drawing mode.
-        
-        Returns:
-            tuple[int, int, int]: The RGB color for drawing.
-        """
-        if self.drawing:
-            if self.pressed_s:
-                return self.maze.start_color
-            elif self.pressed_g:
-                return self.maze.goal_color
-            return self.maze.wall_color
-        elif self.erasing:
-            return self.maze.path_color
-        return None
 
     def _handle_events(self) -> None:
         """
@@ -397,7 +439,7 @@ class MazeApp:
                     self.drawing = False
                     self.erasing = True
 
-                pos = self.scale_mouse_to_virtual(event, self.screen)
+                pos = self._scale_mouse_to_virtual(event, self.screen)
                 if pos is not None:
                     color = self._get_current_color()
                     if color is not None:
@@ -408,7 +450,7 @@ class MazeApp:
                 self.erasing = False
 
             elif event.type == pygame.MOUSEMOTION:
-                pos = self.scale_mouse_to_virtual(event, self.screen)
+                pos = self._scale_mouse_to_virtual(event, self.screen)
                 if pos is not None:
                     color = self._get_current_color()
                     if color is not None:
@@ -456,6 +498,10 @@ class MazeApp:
                         self.generate(type=MazeGeneratorAlgorithm.PRIM, show_process=True)
                         self.last_ctrl_combo_time = now
 
+                    elif event.key == pygame.K_s:
+                        self.stop_animation()
+                        self.last_ctrl_combo_time = now
+
             elif event.type == pygame.KEYUP:
                 pressed_keys.discard(event.key)
 
@@ -483,5 +529,4 @@ class MazeApp:
             self.control_pressed = True
         else:
             self.control_pressed = False
-            self.last_ctrl_combo_time = 0
     

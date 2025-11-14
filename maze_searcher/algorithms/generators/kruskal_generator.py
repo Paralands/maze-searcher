@@ -18,6 +18,9 @@ class KruskalGenerator(GeneratorBase):
     def generate(self) -> Iterator[np.ndarray]:
         """
         Generates a maze using Kruskal's algorithm.
+
+        Yields:
+            np.ndarray: The maze grid at each step of generation.
         """
         size = self.size
         grid = np.zeros((size, size), dtype=int)

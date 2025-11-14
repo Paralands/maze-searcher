@@ -18,6 +18,9 @@ class PrimGenerator(GeneratorBase):
     def generate(self) -> Iterator[np.ndarray]:
         """
         Generates a maze using Prim's algorithm.
+
+        Yields:
+            np.ndarray: The maze grid at each step of generation.
         """
         # 0 = wall, 1 = path
         grid = np.zeros((self.size, self.size), dtype=int)

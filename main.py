@@ -4,7 +4,7 @@ maze = Maze(35)
 app = MazeApp(maze)
 
 # Schedule initial tasks before running
-app.post_task(lambda: app.generate(type=MazeGeneratorAlgorithm.KRUSKAL, show_process=False))
+app.post_task(lambda: app.generate(type=MazeGeneratorAlgorithm.KRUSKAL))
 
 # Start the interactive maze window
 app.run()
