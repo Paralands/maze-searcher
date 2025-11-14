@@ -56,21 +56,21 @@ python main.py
 
 ## Usage / Controls
 
-  Action                    Key / Mouse
-  ------------------------- ----------------------
-  Draw walls                Left-click + drag
-  Erase walls               Right-click + drag
-  Set Start cell            Hold S while drawing
-  Set Goal cell             Hold G while drawing
-  Step once                 Space (tap)
-  Auto-step                 Hold Space
-  Solve with A\*            Y
-  Reset maze                R
-  Generate maze (DFS)       Ctrl + D
-  Generate maze (Kruskal)   Ctrl + K
-  Generate maze (Prim)      Ctrl + P
-  Stop animation            Ctrl + S
-  Quit                      Window close button
+| Action                   | Key / Mouse           |
+|--------------------------|------------------------|
+| Draw walls               | Left-click + drag      |
+| Erase walls              | Right-click + drag     |
+| Set Start cell           | Hold **S** while drawing |
+| Set Goal cell            | Hold **G** while drawing |
+| Step once                | **Space** (tap)        |
+| Auto-step                | Hold **Space**         |
+| Solve with A*            | **Y**                  |
+| Reset maze               | **R**                  |
+| Generate maze (DFS)      | **Ctrl + D**           |
+| Generate maze (Kruskal)  | **Ctrl + K**           |
+| Generate maze (Prim)     | **Ctrl + P**           |
+| Stop animation           | **Ctrl + S**           |
+| Quit                     | Window close button    |
 
 ------------------------------------------------------------------------
 
